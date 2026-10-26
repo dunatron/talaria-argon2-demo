@@ -1,0 +1,30 @@
+# Drop-in for VPS path /opt/talaria/demos/argon2/
+# Infra wires nginx + DNS for argon2-demo.newtalaria.com.
+#
+# Required env (file or shell):
+#   TALARIA_API_KEY=tal_live_…
+# Optional:
+#   TALARIA_DSN=https://ingest.newtalaria.com
+#   TALARIA_RELEASE=argon2-demo
+#   TALARIA_DASHBOARD_URL=https://one.newtalaria.com/…  (project deep link)
+
+services:
+  argon2-demo:
+    build:
+      context: ..
+      dockerfile: argon2demo_server/Dockerfile
+    image: talaria/argon2-demo:latest
+    restart: unless-stopped
+    environment:
+      TALARIA_API_KEY: ${TALARIA_API_KEY:?set TALARIA_API_KEY}
+      TALARIA_DSN: ${TALARIA_DSN:-https://ingest.newtalaria.com}
+      TALARIA_RELEASE: ${TALARIA_RELEASE:-argon2-demo}
+      TALARIA_DASHBOARD_URL: ${TALARIA_DASHBOARD_URL:-https://one.newtalaria.com}
+      runmode: production
+    # Internal only — nginx on the host terminates TLS.
+    ports:
+      - "127.0.0.1:8180:8180"   # API (RPC)
+      - "127.0.0.1:8182:8182"   # Web UI + /demo/hash
+    # Memory headroom: each OWASP hash ≈ 19 MiB + overhead.
+    mem_limit: 512m
+    cpus: 1.0

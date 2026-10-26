@@ -1,0 +1,57 @@
+# nginx server block snippet for argon2-demo.newtalaria.com
+# Place under sites-available / include from the Talaria edge nginx.
+#
+# Hard rate limits: password-grade hashes are CPU+RAM expensive.
+# App also enforces max 1 in-flight hash (HTTP 429 JSON).
+# limit_req must return JSON (not the default HTML error page) so the
+# demo UI can show a friendly message instead of a JSON parse error.
+
+limit_req_zone $binary_remote_addr zone=argon2_demo:10m rate=6r/m;
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name argon2-demo.newtalaria.com;
+
+    # ssl_certificate / ssl_certificate_key — Infra fills these.
+
+    # Return JSON for rate-limit / overload (default nginx pages are HTML).
+    limit_req_status 429;
+    error_page 429 = @argon2_rate_limited;
+    error_page 503 = @argon2_rate_limited;
+
+    location @argon2_rate_limited {
+        default_type application/json;
+        add_header Retry-After 10 always;
+        return 429 '{"error":"too_many_requests","message":"Rate limited — try again in a few seconds."}';
+    }
+
+    # Tiny UI + compare endpoint on the Relic web server.
+    location / {
+        limit_req zone=argon2_demo burst=2 nodelay;
+        proxy_pass http://127.0.0.1:8182;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Hash can take several hundred ms — don't cut it short.
+        proxy_read_timeout 60s;
+    }
+
+    # Optional: expose Serverpod RPC API (client.demo.hash) on same host.
+    location /demo {
+        # Serverpod RPC for DemoEndpoint lives on the API port.
+        # Prefer /demo/hash on the web server (above) for the public button.
+        # NOTE: Relic serves GET|POST /demo/hash on :8182 via location /.
+        # This /demo block is only for Serverpod RPC on :8180 if wired.
+        limit_req zone=argon2_demo burst=1 nodelay;
+        proxy_pass http://127.0.0.1:8180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}

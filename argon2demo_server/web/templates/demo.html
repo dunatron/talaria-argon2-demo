@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Talaria · Serverpod Argon2 compare</title>
+    <link rel="stylesheet" href="{{{@/web/css/style.css}}}">
+    <style>
+      body { font-family: ui-sans-serif, system-ui, sans-serif; background: #0b1020; color: #e8ecf5; margin: 0; }
+      .wrap { max-width: 560px; margin: 48px auto; padding: 0 20px; }
+      h1 { font-size: 1.4rem; margin: 0 0 8px; }
+      .sub { color: #9aa6c3; font-size: 0.95rem; line-height: 1.45; margin-bottom: 24px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      button {
+        background: #5b7cfa; color: white; border: 0; border-radius: 8px;
+        padding: 12px 16px; font-size: 0.95rem; cursor: pointer; font-weight: 600;
+      }
+      button.secondary { background: #2a3558; }
+      button.slow { background: #c45c6a; }
+      button.fast { background: #3d9b7a; }
+      button:disabled { opacity: 0.5; cursor: wait; }
+      .card {
+        margin-top: 20px; background: #141b2f; border: 1px solid #24304f;
+        border-radius: 12px; padding: 16px 18px; display: none;
+      }
+      .card.show { display: block; }
+      .row { display: flex; justify-content: space-between; padding: 6px 0; gap: 12px; }
+      .label { color: #9aa6c3; }
+      .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+      .muted { color: #6f7a96; font-weight: 500; }
+      .err { color: #ff8e8e; margin-top: 12px; }
+      a { color: #8eb0ff; }
+      .foot { margin-top: 28px; font-size: 0.85rem; color: #6f7a96; line-height: 1.4; }
+      code { background: #1c2540; padding: 1px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Serverpod Argon2 · slow vs native</h1>
+      <p class="sub">
+        Educational compare of PointyCastle Argon2id (pre Serverpod 4.0.3) vs
+        <code>serverpod_argon2</code> native (4.0.3+), at OWASP
+        <code>m=19456 t=2 p=1</code>. Fixed fake password only — no user data.
+        Each path is wrapped in a Talaria INTERNAL span.
+      </p>
+      <div class="actions">
+        <button id="runPc" class="slow" type="button" data-impl="pointycastle">
+          PointyCastle (slow)
+        </button>
+        <button id="runNat" class="fast" type="button" data-impl="native">
+          Native
+        </button>
+        <button id="runBoth" class="secondary" type="button" data-impl="both">
+          Run both
+        </button>
+      </div>
+      <div id="err" class="err"></div>
+      <div id="card" class="card">
+        <div class="row"><span class="label">Last run</span><span class="val" id="impl">—</span></div>
+        <div class="row"><span class="label">PointyCastle</span><span class="val" id="pc">—</span></div>
+        <div class="row"><span class="label">Native (serverpod_argon2)</span><span class="val" id="nat">—</span></div>
+        <div class="row"><span class="label">Ratio (slow / native)</span><span class="val" id="ratio">—</span></div>
+        <p class="foot" style="margin-top:14px">
+          Open the waterfall in Talaria —
+          spans <code>auth.passwordHash.pointycastle</code> /
+          <code>auth.passwordHash.native</code>.
+          <br><a id="dash" href="{{dashboardUrl}}" target="_blank" rel="noopener">Open dashboard project →</a>
+        </p>
+      </div>
+      <p class="foot">
+        Served {{served}}. API: <code>GET|POST /demo/hash?impl=pointycastle|native|both</code>.
+        Rate limit: 1 in-flight hash. Build with <code>dart build cli</code>.
+      </p>
+    </div>
+    <script>
+      const buttons = [
+        document.getElementById('runPc'),
+        document.getElementById('runNat'),
+        document.getElementById('runBoth'),
+      ];
+      const labels = {
+        pointycastle: 'PointyCastle (slow)',
+        native: 'Native',
+        both: 'Run both',
+      };
+      const card = document.getElementById('card');
+      const err = document.getElementById('err');
+      let inFlight = false;
+
+      function setBusy(busy, activeImpl) {
+        inFlight = busy;
+        for (const b of buttons) {
+          b.disabled = busy;
+          const impl = b.getAttribute('data-impl');
+          if (busy && impl === activeImpl) {
+            b.textContent = 'Hashing…';
+          } else {
+            b.textContent = labels[impl];
+          }
+        }
+      }
+
+      function friendlyError(status, data) {
+        if (status === 429) {
+          return (data && data.message) ||
+            'Rate limited — try again in a few seconds.';
+        }
+        if (data && data.message) return data.message;
+        if (status >= 500) {
+          return 'Server busy — try again shortly.';
+        }
+        if (status > 0) {
+          return 'Request failed (' + status + '). Try again shortly.';
+        }
+        return 'Network error — try again shortly.';
+      }
+
+      function parseBody(res, text) {
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        const looksJson = ct.includes('application/json') ||
+          /^\s*[\{\[]/.test(text);
+        if (!looksJson) return null;
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function fmtMs(v) {
+        return (typeof v === 'number') ? (v + ' ms') : '—';
+      }
+
+      async function runImpl(impl) {
+        if (inFlight) return;
+        err.textContent = '';
+        setBusy(true, impl);
+        try {
+          const res = await fetch('/demo/hash?impl=' + encodeURIComponent(impl), {
+            method: 'POST',
+          });
+          const text = await res.text();
+          const data = parseBody(res, text);
+
+          if (res.status === 429 || !res.ok) {
+            throw new Error(friendlyError(res.status, data));
+          }
+          if (!data || (data.pointycastleMs == null && data.nativeMs == null)) {
+            throw new Error(
+              'Unexpected response from server. Try again shortly.'
+            );
+          }
+
+          const ran = data.impl || impl;
+          document.getElementById('impl').textContent =
+            ran === 'both' ? 'both' :
+            ran === 'pointycastle' ? 'PointyCastle only' : 'Native only';
+          document.getElementById('pc').textContent = fmtMs(data.pointycastleMs);
+          document.getElementById('pc').className =
+            'val' + (data.pointycastleMs == null ? ' muted' : '');
+          document.getElementById('nat').textContent = fmtMs(data.nativeMs);
+          document.getElementById('nat').className =
+            'val' + (data.nativeMs == null ? ' muted' : '');
+          document.getElementById('ratio').textContent =
+            (typeof data.ratio === 'number')
+              ? (Number(data.ratio).toFixed(2) + '×')
+              : '—';
+          document.getElementById('ratio').className =
+            'val' + (typeof data.ratio !== 'number' ? ' muted' : '');
+          card.classList.add('show');
+        } catch (e) {
+          const msg = (e && e.message) ? e.message : String(e);
+          if (/unexpected token|is not valid json|syntaxerror/i.test(msg) ||
+              /^\s*</.test(msg)) {
+            err.textContent = 'Rate limited — try again in a few seconds.';
+          } else {
+            err.textContent = msg;
+          }
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      for (const b of buttons) {
+        b.addEventListener('click', () => runImpl(b.getAttribute('data-impl')));
+      }
+    </script>
+  </body>
+</html>

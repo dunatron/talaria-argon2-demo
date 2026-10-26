@@ -1,0 +1,26 @@
+# Production / VPS compose: internal ports match Infra pins
+# (8180 API, 8182 web). Nginx terminates TLS at argon2-demo.newtalaria.com.
+
+apiServer:
+  port: 8180
+  publicHost: argon2-demo.newtalaria.com
+  publicPort: 443
+  publicScheme: https
+
+insightsServer:
+  port: 8181
+  publicHost: argon2-demo.newtalaria.com
+  publicPort: 443
+  publicScheme: https
+
+webServer:
+  port: 8182
+  publicHost: argon2-demo.newtalaria.com
+  publicPort: 443
+  publicScheme: https
+
+maxRequestSize: 524288
+
+sessionLogs:
+  consoleEnabled: true
+  consoleLogFormat: json

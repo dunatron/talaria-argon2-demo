@@ -1,0 +1,20 @@
+name: argon2demo_server
+description: Thin Serverpod Argon2 PointyCastle vs native compare demo for Talaria.
+publish_to: none
+
+environment:
+  sdk: '^3.12.2'
+
+resolution: workspace
+
+dependencies:
+  pointycastle: ^4.0.0
+  serverpod: 4.0.4
+  serverpod_argon2: 0.1.0
+  talaria: ^0.3.8
+  talaria_serverpod: ^0.2.6
+
+dev_dependencies:
+  lints: '>=3.0.0 <7.0.0'
+  serverpod_test: 4.0.4
+  test: ^1.25.5

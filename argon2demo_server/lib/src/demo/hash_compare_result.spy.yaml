@@ -1,0 +1,10 @@
+### Result of a PointyCastle vs native Argon2id compare.
+### Durations only — never hash bytes.
+class: HashCompareResult
+fields:
+  pointycastleMs: int
+  nativeMs: int
+  ratio: double
+  memoryKiB: int
+  iterations: int
+  parallelism: int
