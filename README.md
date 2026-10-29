@@ -30,8 +30,10 @@ Always use **`dart build cli`**:
 cd /workspace/talaria/demos/argon2demo
 cd argon2demo_server && dart pub get && serverpod generate && cd ..
 
-export TALARIA_API_KEY=tal_live_YOUR_DEV_KEY   # optional for timings-only; required for waterfalls
+export TALARIA_API_KEY=tal_sk_YOUR_SECRET_KEY   # optional for timings-only; required for waterfalls
 export TALARIA_RELEASE=argon2-demo-local
+# export TALARIA_COMMIT_SHA=abc1234                  # optional, stamped on the release
+# export TALARIA_URL=https://ingest-nz1.newtalaria.com  # only to override the key's cell
 export TALARIA_DASHBOARD_URL=https://one.newtalaria.com   # UI deep link
 
 cd argon2demo_server
@@ -45,7 +47,9 @@ dart build cli --target bin/main.dart --output build
 - RPC: `client.demo.hash()` on API port **8080** (dev) / **8180** (production)
 
 Without `TALARIA_API_KEY` the server still returns timings (NoOp spans). With a
-`tal_live_…` key, enable **tracing** on that project environment for waterfalls.
+`tal_sk_…` secret key, enable **tracing** on that project environment for waterfalls.
+The key's cell selects the ingest host (`https://ingest-<cell>.newtalaria.com`;
+an nz1 key uses `https://ingest-nz1.newtalaria.com`). Set `TALARIA_URL` only to override it.
 
 ---
 
@@ -54,9 +58,10 @@ Without `TALARIA_API_KEY` the server still returns timings (NoOp spans). With a
 ```dart
 Serverpod(..., databaseInterceptor: TalariaServerpod.interceptDatabase, …);
 await TalariaServerpod.init(TalariaOptions(
-  dsn: 'https://ingest.newtalaria.com',
   apiKey: Platform.environment['TALARIA_API_KEY']!,
+  url: Platform.environment['TALARIA_URL'], // null → host from the key's cell
   release: Platform.environment['TALARIA_RELEASE'] ?? 'argon2-demo',
+  commitSha: Platform.environment['TALARIA_COMMIT_SHA'],
   tags: {'service': 'argon2-demo'},
 ));
 TalariaServerpod.attach(pod);
@@ -64,9 +69,10 @@ TalariaServerpod.attach(pod);
 
 | Env | Required | Notes |
 |---|---|---|
-| `TALARIA_API_KEY` | for ingest | `tal_live_…` from Project settings → Client keys |
-| `TALARIA_DSN` | no | default `https://ingest.newtalaria.com` |
+| `TALARIA_API_KEY` | for ingest | `tal_sk_…` secret key from Project settings → Client keys |
+| `TALARIA_URL` | no | optional override; otherwise `https://ingest-<cell>.newtalaria.com` |
 | `TALARIA_RELEASE` | no | default `argon2-demo` |
+| `TALARIA_COMMIT_SHA` | no | stamped on the release when set |
 | `TALARIA_DASHBOARD_URL` | no | shown under “Run compare” |
 
 ---

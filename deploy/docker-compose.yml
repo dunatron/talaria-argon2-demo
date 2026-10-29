@@ -2,10 +2,11 @@
 # Infra wires nginx + DNS for argon2-demo.newtalaria.com.
 #
 # Required env (file or shell):
-#   TALARIA_API_KEY=tal_live_…
+#   TALARIA_API_KEY=tal_sk_…   (secret client key; cell selects the ingest host)
 # Optional:
-#   TALARIA_DSN=https://ingest.newtalaria.com
+#   TALARIA_URL=https://ingest-nz1.newtalaria.com   # override only
 #   TALARIA_RELEASE=argon2-demo
+#   TALARIA_COMMIT_SHA=…
 #   TALARIA_DASHBOARD_URL=https://one.newtalaria.com/…  (project deep link)
 
 services:
@@ -17,8 +18,9 @@ services:
     restart: unless-stopped
     environment:
       TALARIA_API_KEY: ${TALARIA_API_KEY:?set TALARIA_API_KEY}
-      TALARIA_DSN: ${TALARIA_DSN:-https://ingest.newtalaria.com}
+      TALARIA_URL: ${TALARIA_URL:-}
       TALARIA_RELEASE: ${TALARIA_RELEASE:-argon2-demo}
+      TALARIA_COMMIT_SHA: ${TALARIA_COMMIT_SHA:-}
       TALARIA_DASHBOARD_URL: ${TALARIA_DASHBOARD_URL:-https://one.newtalaria.com}
       runmode: production
     # Internal only — nginx on the host terminates TLS.

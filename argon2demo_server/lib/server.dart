@@ -10,16 +10,25 @@ import 'src/web/routes/root.dart';
 
 /// Thin Argon2 compare demo — PointyCastle vs serverpod_argon2 under Talaria.
 void run(List<String> args) async {
-  final dashboardUrl = Platform.environment['TALARIA_DASHBOARD_URL'] ??
+  final dashboardUrl =
+      Platform.environment['TALARIA_DASHBOARD_URL'] ??
       'https://one.newtalaria.com';
   final apiKey = (Platform.environment['TALARIA_API_KEY'] ?? '').trim();
+  // Empty means "derive from the key's cell". Only TALARIA_URL overrides that.
+  final ingestUrl = (Platform.environment['TALARIA_URL'] ?? '').trim();
+  final release = (Platform.environment['TALARIA_RELEASE'] ?? '').trim();
+  final commitSha = (Platform.environment['TALARIA_COMMIT_SHA'] ?? '').trim();
 
   final pod = Serverpod(
     args,
     databaseInterceptor: TalariaServerpod.interceptDatabase,
     experimentalFeatures: ExperimentalFeatures(
       diagnosticEventHandlers: [
-        AsEventHandler<ExceptionEvent>((event, {required space, required context}) {
+        AsEventHandler<ExceptionEvent>((
+          event, {
+          required space,
+          required context,
+        }) {
           TalariaServerpod.handleExceptionEvent(event);
         }),
       ],
@@ -29,21 +38,24 @@ void run(List<String> args) async {
   if (apiKey.isNotEmpty) {
     await TalariaServerpod.init(
       TalariaOptions(
-        dsn: Platform.environment['TALARIA_DSN'] ??
-            'https://ingest.newtalaria.com',
         apiKey: apiKey,
-        release: Platform.environment['TALARIA_RELEASE'] ?? 'argon2-demo',
+        url: ingestUrl.isEmpty ? null : ingestUrl,
+        release: release.isEmpty ? 'argon2-demo' : release,
+        commitSha: commitSha.isEmpty ? null : commitSha,
         minLevel: SeverityLevel.warning,
         tags: {'service': 'argon2-demo'},
       ),
     );
     TalariaServerpod.attach(pod);
-    stdout.writeln('argon2-demo: Talaria attached (release='
-        '${Platform.environment['TALARIA_RELEASE'] ?? 'argon2-demo'})');
+    final attachedRelease = release.isEmpty ? 'argon2-demo' : release;
+    stdout.writeln(
+      'argon2-demo: Talaria attached (release=$attachedRelease)',
+    );
   } else {
     stderr.writeln(
       'argon2-demo: TALARIA_API_KEY unset — timings work, spans not ingested. '
-      'Set tal_live_… from Project settings → Client keys for waterfalls.',
+      'Set a tal_sk_… secret key from Project settings → Client keys '
+      'for waterfalls.',
     );
   }
 
