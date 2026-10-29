@@ -69,12 +69,15 @@ class HashCompare {
 
   /// Run one or both hashes under Talaria INTERNAL spans.
   /// Throws [HashBusyException] when [kMaxInFlightHashes] is already in use.
-  static Future<({
-    HashImpl impl,
-    int? pointycastleMs,
-    int? nativeMs,
-    double? ratio,
-  })> run({HashImpl impl = HashImpl.both}) async {
+  static Future<
+    ({
+      HashImpl impl,
+      int? pointycastleMs,
+      int? nativeMs,
+      double? ratio,
+    })
+  >
+  run({HashImpl impl = HashImpl.both}) async {
     if (!_gate.tryAcquire()) {
       throw HashBusyException();
     }

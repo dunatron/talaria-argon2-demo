@@ -13,7 +13,8 @@ Sync the whole `argon2demo/` tree (or at least `argon2demo_server/` + `deploy/` 
 # From the synced tree:
 cd /opt/talaria/demos/argon2
 cp deploy/.env.example deploy/.env   # first time only
-# edit deploy/.env → real tal_live_… key + dashboard deep link
+# edit deploy/.env → real tal_sk_… secret key + dashboard deep link
+# Leave TALARIA_URL unset unless overriding the key's cell ingest host.
 set -a && source deploy/.env && set +a
 docker compose -f deploy/docker-compose.yml up -d --build
 ```

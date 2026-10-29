@@ -4,7 +4,7 @@ import 'package:serverpod/serverpod.dart';
 
 class RootRoute extends WidgetRoute {
   RootRoute({this.dashboardUrl})
-      : super(cacheBustingConfig: cacheBustingConfig);
+    : super(cacheBustingConfig: cacheBustingConfig);
 
   final String? dashboardUrl;
 
